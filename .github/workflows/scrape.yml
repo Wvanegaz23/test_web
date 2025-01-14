@@ -1,0 +1,40 @@
+#Nombre del flujo de trabajo
+name: "Scrabe"
+
+on:
+#Ejecución manual del flujo de trabajo
+  workflow_dispatch:
+#Se ejecutara todos los dias a las 00:00 Codigo cron
+  schedule:
+    - cron: "0 0 * * *"
+
+#Listado de pasos  descripción del job computadora ubuntu-latest
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+      #Hace chequeo de los archivos
+        uses: actions/checkout@v2
+      #Uso de la version 3.12 de python
+      - name: Setup up python 3.12
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.12"  
+      #Instalación de dependencias
+      - name: Install dependencies
+        run:
+            pip install --upgrade pip
+            pip install -r requirements.txt
+      #Ejecución del scraper
+      - name: Run scraper
+        run: python scrape.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.email "andres.1085@hotmail.com"
+          git config --global user.name "Andrés Vanegas"
+          git add data/
+          git diff --staged --quiet || git commit -- 'Nuevos datos'
+          git push
