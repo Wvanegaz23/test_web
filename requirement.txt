@@ -1,5 +1,0 @@
-selenium
-pandas
-re
-time
-webdriver_manager

@@ -10,17 +10,14 @@ import time
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import WebDriverException, TimeoutException, NoSuchElementException
 from datetime import timedelta
+from pathlib import Path
 
 
-"""data_dir = path('data')
-data_dir.mkdir(exist_ok=True, parents=True)"""
 
-"""try:
-    with open(data_dir / 'cutoff_date.txt') as f:
-        CUTOFF_DATE: datetime = datetime.fromisoformat(f.read())
-except:
-    CUTOFF_DATE = datenow() - timedelta(days=365*100)
-"""
+# Crear un directorio llamado 'data'
+data_dir = Path('data')
+data_dir.mkdir(exist_ok=True, parents=True)
+
 
 def setup_chrome_driver():
     """
@@ -159,11 +156,20 @@ def extraer_marca(producto):
     return ' '.join([word for word in producto.split() if word.isupper()])
 
 
-def guardar_resultados(df, nombre_archivo=f'productos_exito {datenow}.csv'):
+def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     """
-    Guarda los resultados en un archivo CSV
+    Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe
     """
     if df is not None and not df.empty:
+        try:
+            # Leer el archivo existente si existe
+            df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
+            # Concatenar los nuevos datos con los existentes
+            df = pd.concat([df_existente, df], ignore_index=True)
+        except FileNotFoundError:
+            # Si el archivo no existe, simplemente guardamos el nuevo DataFrame
+            pass
+
         df.to_csv(nombre_archivo, index=False, encoding='utf-8-sig')
         print(f"Resultados guardados exitosamente en {nombre_archivo}")
         print(f"Se guardaron {len(df)} productos")
@@ -175,9 +181,4 @@ if __name__ == "__main__":
     # Puedes ajustar el número máximo de páginas aquí
     df_productos = scrape_exito_products(max_pages=28)
     guardar_resultados(df_productos)
-
-with open(data_dir / 'cutoff_date.txt', 'w') as f:
-    f.write(datenow().isoformat())
-
-"""whit open(data_dir / 'cutoff_date.txt') as f:
-    CUTOFF_DATE: datetime = datetime.fromisoformat(f.read())"""
+    print("Proceso de scraping finalizado")
