@@ -7,7 +7,6 @@ on:
   # Se ejecutará todos los días a las 00:00 Código cron
   schedule:
     - cron: "0 5 * * *"
-    
 
 # Listado de pasos descripción del job computadora ubuntu-latest
 jobs:
