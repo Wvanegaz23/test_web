@@ -67,13 +67,21 @@ def scrape_page(driver, url, wait):
     items_nombres = driver.find_elements(By.CLASS_NAME, "styles_name__qQJiK")
     items_precios = driver.find_elements(By.CLASS_NAME, "ProductPrice_container__price__XmMWA")
     items_priceUnd = driver.find_elements(By.CLASS_NAME, "product-unit_price-unit__text__qeheS ")# Encuentra los elementos con la clase especificada
+    items_priceProm = driver.find_elements(By.CLASS_NAME, "priceSection_container-promotion__RSQZO")
+    # Extraer información - buscar enlaces dentro de los divs con la clase específica
+    product_elements = driver.find_elements(By.CSS_SELECTOR, "div.productCard_productInfo__yn2lK a[data-testid='product-link']")
 
     productos = [nombre.text.strip() for nombre in items_nombres]
     precios = [precio.text.strip() for precio in items_precios]
     priceUnds = [priceUnd.text.strip() for priceUnd in items_priceUnd]
+    priceProm = [priceProm.text.strip() for priceProm in items_priceProm]
+    # Obtener los enlaces
+    elements = []
+    for element in product_elements:
+      elements.append(element.get_attribute('href')) 
 
     print(f"Encontrados {len(productos)} productos en esta página")
-    return productos, precios, priceUnds
+    return productos, precios, priceUnds, priceProm,elements
 
 def scrape_exito_products(max_pages=5):
     """
@@ -93,6 +101,8 @@ def scrape_exito_products(max_pages=5):
         all_productos = []
         all_precios = []
         all_priceUnd = []
+        all_priceProm = []
+        all_elements = []
 
         # Scrapear cada página
         for page in range(max_pages):
@@ -102,7 +112,7 @@ def scrape_exito_products(max_pages=5):
                 url = f"https://www.exito.com/mercado/despensa?category-1=mercado&category-2=despensa&facets=category-1%2Ccategory-2&sort=score_desc&page={page}"
 
             print(f"\nScraping página {page + 1}")
-            productos, precios, priceUnds = scrape_page(driver, url, wait)
+            productos, precios, priceUnds, priceProm, elements = scrape_page(driver, url, wait)
 
             # Si no hay productos, asumimos que llegamos al final
             if not productos:
@@ -112,6 +122,8 @@ def scrape_exito_products(max_pages=5):
             all_productos.extend(productos)
             all_precios.extend(precios)
             all_priceUnd.extend(priceUnds)
+            all_priceProm.extend(priceProm)
+            all_elements.extend(elements)
 
             # Pequeña pausa entre páginas
             time.sleep(2)
@@ -120,7 +132,9 @@ def scrape_exito_products(max_pages=5):
         df = pd.DataFrame({
             'Producto': all_productos,
             'Precio': all_precios,
-            'Precio_Unidad': all_priceUnd
+            'Precio_Unidad': all_priceUnd,
+            'Precio_Promocion': all_priceProm,
+            'Link': all_elements
         })
 
         # Aplicar las funciones a la columna 'Producto' y crear nuevas columnas 'Peso', 'Categoria' y 'Marca'
@@ -128,6 +142,7 @@ def scrape_exito_products(max_pages=5):
         df['Categoria'] = df['Producto'].apply(extraer_categoria)
         df['Marca'] = df['Producto'].apply(extraer_marca)
         df['Fecha'] = pd.to_datetime('today').strftime('%Y-%m-%d')
+        df['link'] = df['Link'].apply(limpiar_link)
 
         print(f"\nTotal de productos encontrados: {len(df)}")
         return df
@@ -140,7 +155,7 @@ def scrape_exito_products(max_pages=5):
         print("Cerrando el navegador...")
         driver.quit()
 
-    # Función para extraer el peso de la columna 'Producto'
+# Función para extraer el peso de la columna 'Producto'
 def extraer_peso(producto):
     match = re.search(r'\((.*?)\)', producto)
     if match:
@@ -154,6 +169,11 @@ def extraer_categoria(producto):
 # Función para extraer las palabras en mayúsculas de la columna 'Producto'
 def extraer_marca(producto):
     return ' '.join([word for word in producto.split() if word.isupper()])
+
+# Función para limpiar los datos de la columna 'Link'
+def limpiar_link(link):
+    link_str = str(link)
+    return link.replace("{'href': '", "").replace("'}", "")
 
 
 def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
