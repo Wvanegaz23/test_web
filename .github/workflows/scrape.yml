@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   # Se ejecutará todos los días a las 00:00 Código cron
   schedule:
-    - cron: "0 5 * * *"
+    - cron: "0 9 * * *"
 
 # Listado de pasos descripción del job computadora ubuntu-latest
 jobs:
