@@ -207,24 +207,47 @@ def limpiar_link(link):
 
 def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     """
-    Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe
+    Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe.
+    Elimina duplicados basándose en todas las columnas excepto 'Fecha'.
+    
+    Args:
+        df: DataFrame a guardar
+        nombre_archivo: Ruta del archivo donde guardar los datos
     """
+    import os
+    
     if df is not None and not df.empty:
         try:
-            # Leer el archivo existente si existe
-            df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
-            # Concatenar los nuevos datos con los existentes
-            df = pd.concat([df_existente, df], ignore_index=True)
-        except FileNotFoundError:
-            # Si el archivo no existe, simplemente guardamos el nuevo DataFrame
-            pass
-
-        df.to_csv(nombre_archivo, index=False, encoding='utf-8-sig')
-        print(f"Resultados guardados exitosamente en {nombre_archivo}")
-        print(f"Se guardaron {len(df)} productos")
+            # Crear el directorio si no existe
+            os.makedirs(os.path.dirname(nombre_archivo), exist_ok=True)
+            
+            try:
+                # Leer el archivo existente si existe
+                df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
+                registros_anteriores = len(df_existente)
+                
+                # Concatenar y eliminar duplicados, manteniendo el registro más reciente
+                columnas_comparacion = [col for col in df.columns if col != 'Fecha']
+                df = pd.concat([df_existente, df], ignore_index=True)
+                df = df.drop_duplicates(subset=columnas_comparacion, keep='last')
+                
+                nuevos_registros = len(df) - registros_anteriores
+                print(f"Registros existentes: {registros_anteriores}")
+                print(f"Nuevos registros añadidos: {nuevos_registros}")
+                
+            except FileNotFoundError:
+                print("Creando nuevo archivo CSV...")
+                nuevos_registros = len(df)
+            
+            # Guardar DataFrame
+            df.to_csv(nombre_archivo, index=False, encoding='utf-8-sig')
+            print(f"Resultados guardados exitosamente en {nombre_archivo}")
+            print(f"Total de registros en archivo: {len(df)}")
+            
+        except Exception as e:
+            print(f"Error al guardar los resultados: {str(e)}")
     else:
         print("No hay datos para guardar")
-
 if __name__ == "__main__":
     print("Iniciando proceso de scraping...")
     df_productos = scrape_exito_products()
