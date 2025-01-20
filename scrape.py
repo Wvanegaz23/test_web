@@ -83,13 +83,17 @@ def scrape_page(driver, url, wait):
     print(f"Encontrados {len(productos)} productos en esta página")
     return productos, precios, priceUnds, priceProm,elements
 
-def scrape_exito_products(max_pages=5):
+def get_url_for_page(page):
+    """
+    Genera la URL correcta para cada página
+    """
+    base_url = "https://www.exito.com/mercado/despensa"
+    category_params = "category-2=despensa&category-3=cafe-chocolate-y-cremas-no-lacteas&facets=category-2%2Ccategory-3&sort=score_desc"
+    return f"{base_url}?{category_params}&page={page}"
+
+def scrape_exito_products():
     """
     Función para hacer scraping de productos de la sección de despensa del Éxito
-    Args:
-        max_pages (int): Número máximo de páginas a scrapear
-    Returns:
-        pandas.DataFrame: DataFrame con la información de los productos
     """
     driver = setup_chrome_driver()
     if driver is None:
@@ -103,49 +107,74 @@ def scrape_exito_products(max_pages=5):
         all_priceUnd = []
         all_priceProm = []
         all_elements = []
+        
+        page = 0
+        productos_encontrados = True
+        intentos_fallidos = 0
+        MAX_INTENTOS_FALLIDOS = 2
 
-        # Scrapear cada página
-        for page in range(max_pages):
-            if page == 0:
-                url = "https://www.exito.com/mercado/despensa?"
-            else:
-                url = f"https://www.exito.com/mercado/despensa?category-1=mercado&category-2=despensa&facets=category-1%2Ccategory-2&sort=score_desc&page={page}"
-
-            print(f"\nScraping página {page + 1}")
+        while productos_encontrados and intentos_fallidos < MAX_INTENTOS_FALLIDOS:
+            url = get_url_for_page(page)
+            print(f"\nScraping página {page + 1}: {url}")
+            
             productos, precios, priceUnds, priceProm, elements = scrape_page(driver, url, wait)
 
-            # Si no hay productos, asumimos que llegamos al final
             if not productos:
-                print(f"No se encontraron productos en la página {page + 1}. Finalizando...")
-                break
+                intentos_fallidos += 1
+                print(f"Intento fallido {intentos_fallidos} de {MAX_INTENTOS_FALLIDOS}")
+                if intentos_fallidos >= MAX_INTENTOS_FALLIDOS:
+                    print("Alcanzado el máximo de intentos fallidos. Finalizando...")
+                    break  # Cambiado de productos_encontrados = False a break
+                continue
 
-            all_productos.extend(productos)
-            all_precios.extend(precios)
-            all_priceUnd.extend(priceUnds)
-            all_priceProm.extend(priceProm)
-            all_elements.extend(elements)
-
-            # Pequeña pausa entre páginas
+            # Verificar que todas las listas tengan la misma longitud
+            min_length = min(len(productos), len(precios), len(priceUnds), len(priceProm), len(elements))
+            if min_length > 0:
+                all_productos.extend(productos[:min_length])
+                all_precios.extend(precios[:min_length])
+                all_priceUnd.extend(priceUnds[:min_length])
+                all_priceProm.extend(priceProm[:min_length])
+                all_elements.extend(elements[:min_length])
+                
+                print(f"Productos encontrados en esta página: {min_length}")
+                print(f"Total de productos acumulados: {len(all_productos)}")
+                
+            intentos_fallidos = 0
+            page += 1
             time.sleep(2)
 
-        # Crear DataFrame con todos los productos
-        df = pd.DataFrame({
-            'Producto': all_productos,
-            'Precio': all_precios,
-            'Precio_Unidad': all_priceUnd,
-            'Precio_Promocion': all_priceProm,
-            'Link': all_elements
-        })
+        # Verificar si se recolectaron productos
+        if len(all_productos) > 0:
+            try:
+                print(f"Creando DataFrame con {len(all_productos)} productos...")
+                
+                # Asegurar que todas las listas tengan la misma longitud
+                min_length = min(len(all_productos), len(all_precios), len(all_priceUnd), 
+                               len(all_priceProm), len(all_elements))
+                
+                df = pd.DataFrame({
+                    'Producto': all_productos[:min_length],
+                    'Precio': all_precios[:min_length],
+                    'Precio_Unidad': all_priceUnd[:min_length],
+                    'Precio_Promocion': all_priceProm[:min_length],
+                    'Link': all_elements[:min_length]
+                })
 
-        # Aplicar las funciones a la columna 'Producto' y crear nuevas columnas 'Peso', 'Categoria' y 'Marca'
-        df['Peso'] = df['Producto'].apply(extraer_peso)
-        df['Categoria'] = df['Producto'].apply(extraer_categoria)
-        df['Marca'] = df['Producto'].apply(extraer_marca)
-        df['Fecha'] = pd.to_datetime('today').strftime('%Y-%m-%d')
-        df['link'] = df['Link'].apply(limpiar_link)
+                # Aplicar las funciones a la columna 'Producto'
+                df['Peso'] = df['Producto'].apply(extraer_peso)
+                df['Categoria'] = df['Producto'].apply(extraer_categoria)
+                df['Marca'] = df['Producto'].apply(extraer_marca)
+                df['Fecha'] = pd.to_datetime('today').strftime('%Y-%m-%d')
+                df['link'] = df['Link'].apply(limpiar_link)
 
-        print(f"\nTotal de productos encontrados: {len(df)}")
-        return df
+                print(f"\nTotal de productos encontrados: {len(df)}")
+                return df
+            except Exception as e:
+                print(f"Error al crear el DataFrame: {e}")
+                return None
+        else:
+            print("No se encontraron productos.")
+            return None
 
     except Exception as e:
         print(f"Error durante el scraping: {e}")
@@ -198,7 +227,6 @@ def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
 
 if __name__ == "__main__":
     print("Iniciando proceso de scraping...")
-    # Puedes ajustar el número máximo de páginas aquí
-    df_productos = scrape_exito_products(max_pages=50)
+    df_productos = scrape_exito_products()
     guardar_resultados(df_productos)
     print("Proceso de scraping finalizado")
