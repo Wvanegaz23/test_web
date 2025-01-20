@@ -199,6 +199,6 @@ def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
 if __name__ == "__main__":
     print("Iniciando proceso de scraping...")
     # Puedes ajustar el número máximo de páginas aquí
-    df_productos = scrape_exito_products(max_pages=28)
+    df_productos = scrape_exito_products(max_pages=50)
     guardar_resultados(df_productos)
     print("Proceso de scraping finalizado")
