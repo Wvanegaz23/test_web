@@ -56,32 +56,53 @@ def scrape_page(driver, url, wait):
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "styles_name__qQJiK")))
     except TimeoutException:
         print(f"Timeout esperando productos en {url}")
-        return [], []
+        return [], [], [], [], []  # Retornamos 5 listas vacías en lugar de 2
 
     # Hacer scroll para asegurar que todos los productos se carguen
     for _ in range(2):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
 
-    # Extraer información
-    items_nombres = driver.find_elements(By.CLASS_NAME, "styles_name__qQJiK")
-    items_precios = driver.find_elements(By.CLASS_NAME, "ProductPrice_container__price__XmMWA")
-    items_priceUnd = driver.find_elements(By.CLASS_NAME, "product-unit_price-unit__text__qeheS ")# Encuentra los elementos con la clase especificada
-    items_priceProm = driver.find_elements(By.CLASS_NAME, "priceSection_container-promotion__RSQZO")
-    # Extraer información - buscar enlaces dentro de los divs con la clase específica
-    product_elements = driver.find_elements(By.CSS_SELECTOR, "div.productCard_productInfo__yn2lK a[data-testid='product-link']")
+    try:
+        # Extraer información
+        items_nombres = driver.find_elements(By.CLASS_NAME, "styles_name__qQJiK")
+        items_precios = driver.find_elements(By.CLASS_NAME, "ProductPrice_container__price__XmMWA")
+        items_priceUnd = driver.find_elements(By.CLASS_NAME, "product-unit_price-unit__text__qeheS")
+        items_priceProm = driver.find_elements(By.CLASS_NAME, "priceSection_container-promotion__RSQZO")
+        product_elements = driver.find_elements(By.CSS_SELECTOR, "div.productCard_productInfo__yn2lK a[data-testid='product-link']")
 
-    productos = [nombre.text.strip() for nombre in items_nombres]
-    precios = [precio.text.strip() for precio in items_precios]
-    priceUnds = [priceUnd.text.strip() for priceUnd in items_priceUnd]
-    priceProm = [priceProm.text.strip() for priceProm in items_priceProm]
-    # Obtener los enlaces
-    elements = []
-    for element in product_elements:
-      elements.append(element.get_attribute('href')) 
+        productos = [nombre.text.strip() for nombre in items_nombres]
+        precios = [precio.text.strip() for precio in items_precios]
+        priceUnds = [priceUnd.text.strip() for priceUnd in items_priceUnd]
+        priceProm = [priceProm.text.strip() for priceProm in items_priceProm]
+        elements = [element.get_attribute('href') for element in product_elements]
 
-    print(f"Encontrados {len(productos)} productos en esta página")
-    return productos, precios, priceUnds, priceProm,elements
+        print(f"Encontrados {len(productos)} productos en esta página")
+        return productos, precios, priceUnds, priceProm, elements
+    
+    except Exception as e:
+        print(f"Error extrayendo datos: {e}")
+        return [], [], [], [], []
+
+# Función para extraer el peso de la columna 'Producto'
+def extraer_peso(producto):
+    match = re.search(r'\((.*?)\)', producto)
+    if match:
+        return match.group(1)
+    return None
+
+# Función para extraer la primera palabra de la columna 'Producto'
+def extraer_categoria(producto):
+    return producto.split()[0]
+
+# Función para extraer las palabras en mayúsculas de la columna 'Producto'
+def extraer_marca(producto):
+    return ' '.join([word for word in producto.split() if word.isupper()])
+
+# Función para limpiar los datos de la columna 'Link'
+def limpiar_link(link):
+    link_str = str(link)
+    return link.replace("{'href': '", "").replace("'}", "")
 
 def get_url_for_page(page):
     """
@@ -184,26 +205,6 @@ def scrape_exito_products():
         print("Cerrando el navegador...")
         driver.quit()
 
-# Función para extraer el peso de la columna 'Producto'
-def extraer_peso(producto):
-    match = re.search(r'\((.*?)\)', producto)
-    if match:
-        return match.group(1)
-    return None
-
-# Función para extraer la primera palabra de la columna 'Producto'
-def extraer_categoria(producto):
-    return producto.split()[0]
-
-# Función para extraer las palabras en mayúsculas de la columna 'Producto'
-def extraer_marca(producto):
-    return ' '.join([word for word in producto.split() if word.isupper()])
-
-# Función para limpiar los datos de la columna 'Link'
-def limpiar_link(link):
-    link_str = str(link)
-    return link.replace("{'href': '", "").replace("'}", "")
-
 
 def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     """
@@ -248,6 +249,7 @@ def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
             print(f"Error al guardar los resultados: {str(e)}")
     else:
         print("No hay datos para guardar")
+
 if __name__ == "__main__":
     print("Iniciando proceso de scraping...")
     df_productos = scrape_exito_products()
