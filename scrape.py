@@ -56,32 +56,53 @@ def scrape_page(driver, url, wait):
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "styles_name__qQJiK")))
     except TimeoutException:
         print(f"Timeout esperando productos en {url}")
-        return [], []
+        return [], [], [], [], []  # Retornamos 5 listas vacías en lugar de 2
 
     # Hacer scroll para asegurar que todos los productos se carguen
     for _ in range(2):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
 
-    # Extraer información
-    items_nombres = driver.find_elements(By.CLASS_NAME, "styles_name__qQJiK")
-    items_precios = driver.find_elements(By.CLASS_NAME, "ProductPrice_container__price__XmMWA")
-    items_priceUnd = driver.find_elements(By.CLASS_NAME, "product-unit_price-unit__text__qeheS ")# Encuentra los elementos con la clase especificada
-    items_priceProm = driver.find_elements(By.CLASS_NAME, "priceSection_container-promotion__RSQZO")
-    # Extraer información - buscar enlaces dentro de los divs con la clase específica
-    product_elements = driver.find_elements(By.CSS_SELECTOR, "div.productCard_productInfo__yn2lK a[data-testid='product-link']")
+    try:
+        # Extraer información
+        items_nombres = driver.find_elements(By.CLASS_NAME, "styles_name__qQJiK")
+        items_precios = driver.find_elements(By.CLASS_NAME, "ProductPrice_container__price__XmMWA")
+        items_priceUnd = driver.find_elements(By.CLASS_NAME, "product-unit_price-unit__text__qeheS")
+        items_priceProm = driver.find_elements(By.CLASS_NAME, "priceSection_container-promotion__RSQZO")
+        product_elements = driver.find_elements(By.CSS_SELECTOR, "div.productCard_productInfo__yn2lK a[data-testid='product-link']")
 
-    productos = [nombre.text.strip() for nombre in items_nombres]
-    precios = [precio.text.strip() for precio in items_precios]
-    priceUnds = [priceUnd.text.strip() for priceUnd in items_priceUnd]
-    priceProm = [priceProm.text.strip() for priceProm in items_priceProm]
-    # Obtener los enlaces
-    elements = []
-    for element in product_elements:
-      elements.append(element.get_attribute('href')) 
+        productos = [nombre.text.strip() for nombre in items_nombres]
+        precios = [precio.text.strip() for precio in items_precios]
+        priceUnds = [priceUnd.text.strip() for priceUnd in items_priceUnd]
+        priceProm = [priceProm.text.strip() for priceProm in items_priceProm]
+        elements = [element.get_attribute('href') for element in product_elements]
 
-    print(f"Encontrados {len(productos)} productos en esta página")
-    return productos, precios, priceUnds, priceProm,elements
+        print(f"Encontrados {len(productos)} productos en esta página")
+        return productos, precios, priceUnds, priceProm, elements
+    
+    except Exception as e:
+        print(f"Error extrayendo datos: {e}")
+        return [], [], [], [], []
+
+# Función para extraer el peso de la columna 'Producto'
+def extraer_peso(producto):
+    match = re.search(r'\((.*?)\)', producto)
+    if match:
+        return match.group(1)
+    return None
+
+# Función para extraer la primera palabra de la columna 'Producto'
+def extraer_categoria(producto):
+    return producto.split()[0]
+
+# Función para extraer las palabras en mayúsculas de la columna 'Producto'
+def extraer_marca(producto):
+    return ' '.join([word for word in producto.split() if word.isupper()])
+
+# Función para limpiar los datos de la columna 'Link'
+def limpiar_link(link):
+    link_str = str(link)
+    return link.replace("{'href': '", "").replace("'}", "")
 
 def get_url_for_page(page):
     """
@@ -184,44 +205,48 @@ def scrape_exito_products():
         print("Cerrando el navegador...")
         driver.quit()
 
-# Función para extraer el peso de la columna 'Producto'
-def extraer_peso(producto):
-    match = re.search(r'\((.*?)\)', producto)
-    if match:
-        return match.group(1)
-    return None
-
-# Función para extraer la primera palabra de la columna 'Producto'
-def extraer_categoria(producto):
-    return producto.split()[0]
-
-# Función para extraer las palabras en mayúsculas de la columna 'Producto'
-def extraer_marca(producto):
-    return ' '.join([word for word in producto.split() if word.isupper()])
-
-# Función para limpiar los datos de la columna 'Link'
-def limpiar_link(link):
-    link_str = str(link)
-    return link.replace("{'href': '", "").replace("'}", "")
-
 
 def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     """
-    Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe
+    Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe.
+    Elimina duplicados basándose en todas las columnas excepto 'Fecha'.
+    
+    Args:
+        df: DataFrame a guardar
+        nombre_archivo: Ruta del archivo donde guardar los datos
     """
+    import os
+    
     if df is not None and not df.empty:
         try:
-            # Leer el archivo existente si existe
-            df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
-            # Concatenar los nuevos datos con los existentes
-            df = pd.concat([df_existente, df], ignore_index=True)
-        except FileNotFoundError:
-            # Si el archivo no existe, simplemente guardamos el nuevo DataFrame
-            pass
-
-        df.to_csv(nombre_archivo, index=False, encoding='utf-8-sig')
-        print(f"Resultados guardados exitosamente en {nombre_archivo}")
-        print(f"Se guardaron {len(df)} productos")
+            # Crear el directorio si no existe
+            os.makedirs(os.path.dirname(nombre_archivo), exist_ok=True)
+            
+            try:
+                # Leer el archivo existente si existe
+                df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
+                registros_anteriores = len(df_existente)
+                
+                # Concatenar y eliminar duplicados, manteniendo el registro más reciente
+                columnas_comparacion = [col for col in df.columns if col != 'Fecha']
+                df = pd.concat([df_existente, df], ignore_index=True)
+                df = df.drop_duplicates(subset=columnas_comparacion, keep='last')
+                
+                nuevos_registros = len(df) - registros_anteriores
+                print(f"Registros existentes: {registros_anteriores}")
+                print(f"Nuevos registros añadidos: {nuevos_registros}")
+                
+            except FileNotFoundError:
+                print("Creando nuevo archivo CSV...")
+                nuevos_registros = len(df)
+            
+            # Guardar DataFrame
+            df.to_csv(nombre_archivo, index=False, encoding='utf-8-sig')
+            print(f"Resultados guardados exitosamente en {nombre_archivo}")
+            print(f"Total de registros en archivo: {len(df)}")
+            
+        except Exception as e:
+            print(f"Error al guardar los resultados: {str(e)}")
     else:
         print("No hay datos para guardar")
 
