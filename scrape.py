@@ -209,7 +209,7 @@ def scrape_exito_products():
 def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     """
     Guarda los resultados en un archivo CSV, agregando los datos al archivo existente si ya existe.
-    Elimina duplicados basándose en todas las columnas excepto 'Fecha'.
+    Elimina duplicados basándose en todas las columnas, incluyendo 'Fecha'.
     
     Args:
         df: DataFrame a guardar
@@ -227,10 +227,9 @@ def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
                 df_existente = pd.read_csv(nombre_archivo, encoding='utf-8-sig')
                 registros_anteriores = len(df_existente)
                 
-                # Concatenar y eliminar duplicados, manteniendo el registro más reciente
-                columnas_comparacion = [col for col in df.columns if col != 'Fecha']
+                # Concatenar y eliminar duplicados en todas las columnas (incluyendo 'Fecha')
                 df = pd.concat([df_existente, df], ignore_index=True)
-                df = df.drop_duplicates(subset=columnas_comparacion, keep='last')
+                df = df.drop_duplicates(keep='last')  # Mantiene el último registro duplicado
                 
                 nuevos_registros = len(df) - registros_anteriores
                 print(f"Registros existentes: {registros_anteriores}")
