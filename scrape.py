@@ -249,6 +249,7 @@ def guardar_resultados(df, nombre_archivo='data/productos_exito.csv'):
     else:
         print("No hay datos para guardar")
 
+
 if __name__ == "__main__":
     print("Iniciando proceso de scraping...")
     df_productos = scrape_exito_products()
